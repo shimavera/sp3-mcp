@@ -1,6 +1,6 @@
 {
   "name": "sp3-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server do Sistema SP3 — conecta a IA (Claude) ao controle.sp3company.com para ver e atualizar atividades por conversa.",
   "type": "module",
   "bin": {

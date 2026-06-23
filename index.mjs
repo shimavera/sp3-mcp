@@ -92,18 +92,39 @@ server.registerTool('listar_clientes',
   async () => { try { return ok(await api('GET', '/clients')) } catch (e) { return fail(e) } }
 )
 
+server.registerTool('listar_membros',
+  { title: 'Listar membros', description: 'Lista os membros ativos do time (id, nome e papel) — para atribuir responsável a uma atividade.', inputSchema: {} },
+  async () => { try { return ok(await api('GET', '/members')) } catch (e) { return fail(e) } }
+)
+
 server.registerTool('criar_atividade',
   {
     title: 'Criar atividade',
-    description: 'Cria uma nova atividade num projeto. Use listar_clientes para obter o project_id.',
+    description: 'Cria uma nova atividade num projeto. Use listar_clientes para o project_id. O responsável pode ser passado pelo nome (ex.: "João") — o sistema resolve no time.',
     inputSchema: {
       project_id: z.string().describe('ID do projeto (de listar_clientes)'),
       title: z.string().describe('Título da atividade'),
+      responsavel: z.string().optional().describe('Nome do responsável (parcial, ex.: "João"). Resolvido no time. Use listar_membros se houver dúvida.'),
       priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
       due_date: z.string().optional().describe('Data de vencimento YYYY-MM-DD'),
     },
   },
   async (args) => { try { return ok(await api('POST', '/tasks', args)) } catch (e) { return fail(e) } }
+)
+
+server.registerTool('editar_atividade',
+  {
+    title: 'Editar atividade',
+    description: 'Edita uma atividade existente: responsável, prazo, prioridade e/ou status. Informe ao menos um campo.',
+    inputSchema: {
+      id: z.string().describe('ID da atividade'),
+      responsavel: z.string().optional().describe('Nome do responsável (parcial). String vazia limpa o responsável.'),
+      due_date: z.string().optional().describe('Novo prazo YYYY-MM-DD. String vazia remove o prazo.'),
+      priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+      status: z.enum(['todo', 'in_progress', 'review', 'done']).optional(),
+    },
+  },
+  async ({ id, ...patch }) => { try { return ok(await api('PATCH', `/tasks/${id}`, patch)) } catch (e) { return fail(e) } }
 )
 
 server.registerTool('concluir_atividade',
