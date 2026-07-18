@@ -126,16 +126,25 @@ server.registerTool('criar_atividade',
 server.registerTool('editar_atividade',
   {
     title: 'Editar atividade',
-    description: 'Edita uma atividade existente: responsável, prazo, prioridade e/ou status. Informe ao menos um campo.',
+    description: 'Edita uma atividade existente: responsável, prazo, prioridade, status e/ou recorrência. Informe ao menos um campo. Use "recorrencia" para ligar (mensal/semanal/quinzenal) ou "nenhuma" para desligar; em mensal, "dia_do_mes".',
     inputSchema: {
       id: z.string().describe('ID da atividade'),
       responsavel: z.string().optional().describe('Nome do responsável (parcial). String vazia limpa o responsável.'),
       due_date: z.string().optional().describe('Novo prazo YYYY-MM-DD. String vazia remove o prazo.'),
       priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
       status: z.enum(['todo', 'in_progress', 'review', 'done']).optional(),
+      recorrencia: z.enum(['mensal', 'semanal', 'quinzenal', 'nenhuma']).optional().describe('Liga/desliga recorrência. "nenhuma" volta a atividade a avulsa.'),
+      dia_do_mes: z.number().int().min(1).max(31).optional().describe('Dia do mês da recorrência mensal (ex.: 20).'),
     },
   },
-  async ({ id, ...patch }) => { try { return ok(await api('PATCH', `/tasks/${id}`, patch)) } catch (e) { return fail(e) } }
+  async ({ id, recorrencia, dia_do_mes, ...patch }) => {
+    try {
+      if (recorrencia === 'nenhuma') patch.recurrence_type = null
+      else if (recorrencia) patch.recurrence_type = RECORRENCIA_MAP[recorrencia]
+      if (dia_do_mes != null) patch.recurring_day = dia_do_mes
+      return ok(await api('PATCH', `/tasks/${id}`, patch))
+    } catch (e) { return fail(e) }
+  }
 )
 
 server.registerTool('concluir_atividade',
