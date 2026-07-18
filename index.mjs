@@ -97,19 +97,30 @@ server.registerTool('listar_membros',
   async () => { try { return ok(await api('GET', '/members')) } catch (e) { return fail(e) } }
 )
 
+const RECORRENCIA_MAP = { mensal: 'monthly', semanal: 'weekly', quinzenal: 'biweekly' }
+
 server.registerTool('criar_atividade',
   {
     title: 'Criar atividade',
-    description: 'Cria uma nova atividade num projeto. Use listar_clientes para o project_id. O responsável pode ser passado pelo nome (ex.: "João") — o sistema resolve no time.',
+    description: 'Cria uma nova atividade num projeto. Use listar_clientes para o project_id. O responsável pode ser passado pelo nome (ex.: "João") — o sistema resolve no time. Para uma atividade RECORRENTE (repete sozinha), passe "recorrencia" (mensal/semanal/quinzenal); em mensal, informe "dia_do_mes" (ex.: 20). O sistema recria a próxima ocorrência automaticamente conforme cada uma é concluída.',
     inputSchema: {
       project_id: z.string().describe('ID do projeto (de listar_clientes)'),
       title: z.string().describe('Título da atividade'),
       responsavel: z.string().optional().describe('Nome do responsável (parcial, ex.: "João"). Resolvido no time. Use listar_membros se houver dúvida.'),
       priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
-      due_date: z.string().optional().describe('Data de vencimento YYYY-MM-DD'),
+      due_date: z.string().optional().describe('Data de vencimento YYYY-MM-DD. Em recorrência, é a 1ª ocorrência (opcional — o sistema calcula se faltar).'),
+      recorrencia: z.enum(['mensal', 'semanal', 'quinzenal']).optional().describe('Torna a atividade recorrente. Ela se repete sozinha (uma ocorrência aberta por vez).'),
+      dia_do_mes: z.number().int().min(1).max(31).optional().describe('Dia do mês da recorrência mensal (ex.: 20). Só para recorrencia="mensal".'),
     },
   },
-  async (args) => { try { return ok(await api('POST', '/tasks', args)) } catch (e) { return fail(e) } }
+  async ({ recorrencia, dia_do_mes, ...args }) => {
+    try {
+      const body = { ...args }
+      if (recorrencia) body.recurrence_type = RECORRENCIA_MAP[recorrencia]
+      if (dia_do_mes != null) body.recurring_day = dia_do_mes
+      return ok(await api('POST', '/tasks', body))
+    } catch (e) { return fail(e) }
+  }
 )
 
 server.registerTool('editar_atividade',
