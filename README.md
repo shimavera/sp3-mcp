@@ -2,7 +2,7 @@
 
 Conecta a IA (Claude) ao **Sistema SP3** (`controle.sp3company.com`). Você conversa com a IA e ela vê e atualiza suas atividades — sem abrir o sistema.
 
-Exemplos: *"quais minhas atividades hoje?"*, *"marca a tarefa X como feita"*, *"o que falta no cliente Vr Odontologia?"*, *"visão geral da agência"*.
+Exemplos: *"quais minhas atividades hoje?"*, *"quais estão paradas?"*, *"como está o financeiro?"*, *"gera contrato da Dentalkids"*.
 
 ## 1. Gere seu token
 
@@ -45,10 +45,33 @@ claude mcp add sp3 --env SP3_TOKEN=COLE_SEU_TOKEN_AQUI -- npx -y github:shimaver
 | `concluir_atividade` | Marca como concluída |
 | `atualizar_status` | Muda o status |
 | `comentar_atividade` | Comenta / anexa evidência |
+| `atividades_paradas` | Atividades abertas com prazo vencido |
+| `ver_financeiro` | MRR, recebíveis e cobranças do mês (sócio) |
+| `preparar_contrato` | Dados cadastrais e comerciais para contrato (sócio) |
+| `gerar_contrato` | Gera DOCX/PDF no Hermes, sem assinar nem enviar (sócio) |
 
 ## Segurança
 
 O token é pessoal e age **em seu nome** — tudo que você faz fica registrado como seu. Pode revogá-lo a qualquer momento em Configurações. Nunca compartilhe.
+
+Financeiro e dados usados em contrato exigem token de sócio. O MCP não assina,
+envia contratos, cria cobranças ou movimenta valores.
+
+## Hermes
+
+No ambiente do Hermes, configure um token pessoal de sócio fora do repositório:
+
+```bash
+SP3_TOKEN=sp3_seu_token_pessoal
+SP3_URL=https://controle.sp3company.com
+SP3_CONTRACT_GENERATOR=/root/hermes-content-os/contracts/sp3/generate-sp3-contract.mjs
+SP3_CONTRACT_CWD=/root/hermes-content-os
+SP3_CONTRACT_OUTPUT_DIR=output/contracts
+```
+
+Com `SP3_CONTRACT_GENERATOR`, a ferramenta `gerar_contrato` executa o gerador
+local do Hermes e retorna os caminhos do DOCX e PDF. O arquivo continua pendente
+de revisão e assinatura humana.
 
 ## Variáveis
 

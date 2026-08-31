@@ -6,9 +6,18 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { promisify } from 'node:util'
 
 const BASE = (process.env.SP3_URL || 'https://controle.sp3company.com').replace(/\/$/, '')
 const TOKEN = process.env.SP3_TOKEN
+const CONTRACT_GENERATOR = process.env.SP3_CONTRACT_GENERATOR
+const CONTRACT_CWD = process.env.SP3_CONTRACT_CWD
+const CONTRACT_OUTPUT_DIR = process.env.SP3_CONTRACT_OUTPUT_DIR || 'output/contracts'
+const execFileAsync = promisify(execFile)
 
 if (!TOKEN) {
   console.error('[sp3-mcp] Falta SP3_TOKEN. Gere o seu em Configurações no sistema e configure no Claude.')
@@ -36,6 +45,67 @@ async function api(method, path, body) {
 
 const ok = (obj) => ({ content: [{ type: 'text', text: typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2) }] })
 const fail = (e) => ({ content: [{ type: 'text', text: `Erro: ${e.message}` }], isError: true })
+
+function brDate() {
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo', day: '2-digit', month: 'long', year: 'numeric',
+  }).format(new Date())
+}
+
+async function generateContract({ clientId, ...input }) {
+  if (!CONTRACT_GENERATOR) {
+    throw new Error('Geração local não configurada. Defina SP3_CONTRACT_GENERATOR no Hermes.')
+  }
+
+  const source = await api('GET', `/contracts/${encodeURIComponent(clientId)}/briefing`)
+  const client = source.client
+  const data = {
+    contractCity: input.contract_city || null,
+    contractDate: input.contract_date || brDate(),
+    client: {
+      name: client.name,
+      type: client.type,
+      document: client.document,
+      address: client.address,
+      legalRepresentative: client.legal_representative,
+      representativeRole: client.representative_role,
+      rg: client.representative_rg,
+    },
+    commercial: {
+      monthlyFee: source.commercial_defaults.monthly_fee,
+      monthlyFeeText: input.monthly_fee_text || null,
+      firstPaymentDate: input.first_payment_date || null,
+      recurringPaymentDay: input.recurring_payment_day || source.commercial_defaults.recurring_payment_day || null,
+      paymentMethod: input.payment_method || source.commercial_defaults.payment_method || null,
+      initialTerm: input.initial_term || null,
+      noticePeriodDays: input.notice_period_days || 30,
+      minimumMediaBudget: input.minimum_media_budget || null,
+      minimumMediaBudgetText: input.minimum_media_budget_text || null,
+    },
+    scope: {
+      googleAds: input.google_ads,
+      tracking: input.tracking,
+      site: { enabled: input.site, domain: input.site_domain || null, marketValue: input.site_market_value || null, marketValueText: input.site_market_value_text || null },
+      googleBusinessProfile: input.google_business_profile,
+      socialConsulting: input.social_consulting,
+      reportsAndSupport: input.reports_and_support,
+    },
+    outputDir: CONTRACT_OUTPUT_DIR,
+  }
+
+  const dir = await mkdtemp(path.join(tmpdir(), 'sp3-contract-'))
+  const briefingPath = path.join(dir, 'briefing.json')
+  try {
+    await writeFile(briefingPath, JSON.stringify(data), { mode: 0o600 })
+    const { stdout } = await execFileAsync(process.execPath, [CONTRACT_GENERATOR, briefingPath], {
+      cwd: CONTRACT_CWD || path.dirname(CONTRACT_GENERATOR),
+      maxBuffer: 1024 * 1024,
+    })
+    return { ...JSON.parse(stdout), client: client.display_name, missing_fields: source.missing_fields }
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+}
 
 const server = new McpServer({ name: 'sp3-mcp', version: '1.0.0' })
 
@@ -88,8 +158,80 @@ server.registerTool('atividades',
 )
 
 server.registerTool('listar_clientes',
-  { title: 'Listar clientes', description: 'Lista os clientes ativos e seus projetos (útil para criar atividades).', inputSchema: {} },
-  async () => { try { return ok(await api('GET', '/clients')) } catch (e) { return fail(e) } }
+  {
+    title: 'Listar clientes',
+    description: 'Lista clientes ativos e seus projetos. Use nome para localizar cliente antes de criar atividade ou contrato.',
+    inputSchema: { nome: z.string().optional().describe('Nome parcial do cliente') },
+  },
+  async ({ nome }) => {
+    try {
+      const qs = new URLSearchParams()
+      if (nome) qs.set('search', nome)
+      return ok(await api('GET', `/clients${qs.size ? `?${qs}` : ''}`))
+    } catch (e) { return fail(e) }
+  }
+)
+
+server.registerTool('atividades_paradas',
+  {
+    title: 'Atividades paradas',
+    description: 'Lista atividades abertas com prazo vencido. Não inclui tarefas sem prazo.',
+    inputSchema: {},
+  },
+  async () => { try { return ok(await api('GET', '/tasks/stalled')) } catch (e) { return fail(e) } }
+)
+
+server.registerTool('ver_financeiro',
+  {
+    title: 'Ver financeiro',
+    description: 'Mostra MRR, carteira, KPIs de recebíveis e cobranças do mês. Exige token de sócio.',
+    inputSchema: { mes: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional().describe('Mês no formato YYYY-MM') },
+  },
+  async ({ mes }) => {
+    try {
+      const qs = mes ? `?month=${encodeURIComponent(mes)}` : ''
+      return ok(await api('GET', `/finance${qs}`))
+    } catch (e) { return fail(e) }
+  }
+)
+
+server.registerTool('preparar_contrato',
+  {
+    title: 'Preparar contrato',
+    description: 'Lê os dados cadastrais e financeiros necessários para contrato de um cliente. Exige token de sócio; não gera nem envia arquivo.',
+    inputSchema: { client_id: z.string().describe('ID do cliente, obtido em listar_clientes') },
+  },
+  async ({ client_id }) => { try { return ok(await api('GET', `/contracts/${encodeURIComponent(client_id)}/briefing`)) } catch (e) { return fail(e) } }
+)
+
+server.registerTool('gerar_contrato',
+  {
+    title: 'Gerar contrato',
+    description: 'Gera DOCX e PDF no Hermes usando o cadastro do cliente no Sistema SP3. Não envia, assina ou publica contrato. Campos comerciais ausentes ficam destacados no arquivo.',
+    inputSchema: {
+      client_id: z.string().describe('ID do cliente, obtido em listar_clientes'),
+      contract_city: z.string().optional().describe('Cidade do contrato'),
+      contract_date: z.string().optional().describe('Data do contrato por extenso'),
+      monthly_fee_text: z.string().optional().describe('Mensalidade por extenso'),
+      first_payment_date: z.string().optional().describe('Primeiro vencimento por extenso'),
+      recurring_payment_day: z.string().optional().describe('Dia de vencimento'),
+      payment_method: z.string().optional().describe('Forma de pagamento'),
+      initial_term: z.string().optional().describe('Prazo inicial de vigência'),
+      notice_period_days: z.number().int().min(1).max(365).optional(),
+      minimum_media_budget: z.string().optional().describe('Verba mínima de mídia'),
+      minimum_media_budget_text: z.string().optional().describe('Verba mínima por extenso'),
+      google_ads: z.boolean().default(false),
+      tracking: z.boolean().default(false),
+      site: z.boolean().default(false),
+      site_domain: z.string().optional(),
+      site_market_value: z.string().optional(),
+      site_market_value_text: z.string().optional(),
+      google_business_profile: z.boolean().default(false),
+      social_consulting: z.boolean().default(false),
+      reports_and_support: z.boolean().default(true),
+    },
+  },
+  async (args) => { try { return ok(await generateContract(args)) } catch (e) { return fail(e) } }
 )
 
 server.registerTool('listar_membros',
