@@ -11,6 +11,7 @@ import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
+import { randomUUID } from 'node:crypto'
 
 const BASE = (process.env.SP3_URL || 'https://controle.sp3company.com').replace(/\/$/, '')
 const TOKEN = process.env.SP3_TOKEN
@@ -168,6 +169,28 @@ server.registerTool('listar_clientes',
       const qs = new URLSearchParams()
       if (nome) qs.set('search', nome)
       return ok(await api('GET', `/clients${qs.size ? `?${qs}` : ''}`))
+    } catch (e) { return fail(e) }
+  }
+)
+
+server.registerTool('criar_cliente_e_projeto',
+  {
+    title: 'Criar cliente e projeto',
+    description: 'Cadastra um cliente com dados mínimos e cria seu projeto inicial em uma operação atômica. Exige token de sócio. Cliente começa como lead; não cria contrato, cobrança ou ciclo financeiro. Se já houver cliente ativo com o mesmo nome, retorna conflito sem duplicar. Depois use criar_atividade com o ID do projeto retornado.',
+    inputSchema: {
+      company_name: z.string().min(1).max(160).describe('Nome do cliente ou clínica'),
+      monthly_fee: z.number().min(0).nullable().optional().describe('Mensalidade em reais, se já definida'),
+      project_name: z.string().min(1).max(160).describe('Nome do projeto inicial'),
+      project_type: z.enum(['recurring', 'one_time', 'campaign']).optional().describe('Tipo do projeto. Padrão: one_time.'),
+      idempotency_key: z.string().uuid().optional().describe('UUID para reconhecer repetição da mesma chamada; gere um novo para uma nova operação.'),
+    },
+  },
+  async ({ idempotency_key, ...args }) => {
+    try {
+      return ok(await api('POST', '/clients/create', {
+        ...args,
+        idempotency_key: idempotency_key || randomUUID(),
+      }))
     } catch (e) { return fail(e) }
   }
 )
