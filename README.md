@@ -41,6 +41,7 @@ claude mcp add sp3 --env SP3_TOKEN=COLE_SEU_TOKEN_AQUI -- npx -y github:shimaver
 | `minhas_atividades` | Suas atividades (filtra por status/cliente) |
 | `atividades` | Atividades de toda a agência |
 | `listar_clientes` | Clientes e projetos |
+| `criar_cliente_e_projeto` | Cria cliente mínimo e projeto inicial (sócio) |
 | `criar_atividade` | Cria atividade num projeto |
 | `concluir_atividade` | Marca como concluída |
 | `atualizar_status` | Muda o status |
@@ -56,6 +57,12 @@ O token é pessoal e age **em seu nome** — tudo que você faz fica registrado 
 
 Financeiro e dados usados em contrato exigem token de sócio. O MCP não assina,
 envia contratos, cria cobranças ou movimenta valores.
+
+`criar_cliente_e_projeto` também exige token de sócio. O cliente é criado como
+lead, sem contrato, cobrança ou ciclo financeiro. A mensalidade é opcional e
+fica registrada no cadastro. Depois, use `criar_atividade` com o `project.id`
+retornado. Cadastros ativos com o mesmo nome retornam conflito em vez de criar
+duplicata.
 
 ## Hermes
 
