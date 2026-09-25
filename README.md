@@ -43,6 +43,13 @@ claude mcp add sp3 --env SP3_TOKEN=COLE_SEU_TOKEN_AQUI -- npx -y github:shimaver
 | `listar_clientes` | Clientes e projetos |
 | `criar_cliente_e_projeto` | Cria cliente mínimo e projeto inicial (sócio) |
 | `criar_atividade` | Cria atividade num projeto |
+| `criar_subtarefa` | Cria subtarefa de cliente vinculada à tarefa-mãe |
+| `listar_tarefas_privadas` | Lista tarefas pessoais de João; outro token recebe acesso negado |
+| `criar_tarefa_privada` | Cria tarefa pessoal fora dos clientes |
+| `criar_subtarefa_privada` | Cria subtarefa de uma tarefa pessoal |
+| `editar_tarefa_privada` | Altera dados ou status de tarefa pessoal |
+| `concluir_tarefa_privada` | Conclui tarefa pessoal |
+| `excluir_tarefa_privada` | Exclui tarefa pessoal de forma reversível |
 | `concluir_atividade` | Marca como concluída |
 | `atualizar_status` | Muda o status |
 | `comentar_atividade` | Comenta / anexa evidência |
@@ -54,6 +61,11 @@ claude mcp add sp3 --env SP3_TOKEN=COLE_SEU_TOKEN_AQUI -- npx -y github:shimaver
 ## Segurança
 
 O token é pessoal e age **em seu nome** — tudo que você faz fica registrado como seu. Pode revogá-lo a qualquer momento em Configurações. Nunca compartilhe.
+
+Tarefas privadas exigem o token vinculado à conta do João Vitor. A API confere
+essa identidade antes da consulta e filtra todas as operações pelo dono. Tokens
+de Juan e de qualquer outro usuário recebem acesso negado. Essas tarefas não
+entram em atividades gerais, clientes, relatórios ou Entregas.
 
 Financeiro e dados usados em contrato exigem token de sócio. O MCP não assina,
 envia contratos, cria cobranças ou movimenta valores.
