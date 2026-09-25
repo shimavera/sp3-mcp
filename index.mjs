@@ -288,6 +288,109 @@ server.registerTool('criar_atividade',
   }
 )
 
+server.registerTool('criar_subtarefa',
+  {
+    title: 'Criar subtarefa de cliente',
+    description: 'Cria subtarefa de uma tarefa geral existente. Herda o projeto da mãe. Para tarefas pessoais, use criar_subtarefa_privada.',
+    inputSchema: {
+      tarefa_mae_id: z.string().uuid(),
+      title: z.string().min(1).max(200),
+      responsavel: z.string().min(1).describe('Nome do membro responsável; use listar_membros em caso de dúvida.'),
+      description: z.string().max(4000).optional(),
+      due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+    },
+  },
+  async ({ tarefa_mae_id, ...body }) => {
+    try { return ok(await api('POST', `/tasks/${encodeURIComponent(tarefa_mae_id)}/subtasks`, body)) } catch (e) { return fail(e) }
+  }
+)
+
+server.registerTool('listar_tarefas_privadas',
+  {
+    title: 'Listar tarefas privadas',
+    description: 'Lista somente as tarefas pessoais de João. Um token de qualquer outra pessoa recebe acesso negado.',
+    inputSchema: { status: z.enum(['todo', 'in_progress', 'done']).optional() },
+  },
+  async ({ status }) => {
+    try { return ok(await api('GET', `/private-tasks${status ? `?status=${status}` : ''}`)) } catch (e) { return fail(e) }
+  }
+)
+
+server.registerTool('criar_tarefa_privada',
+  {
+    title: 'Criar tarefa privada',
+    description: 'Cria tarefa pessoal de João, fora dos clientes, relatórios e tarefas da equipe. Exige o token pessoal de João.',
+    inputSchema: {
+      title: z.string().min(1).max(200),
+      context: z.string().max(160).optional(),
+      description: z.string().max(4000).optional(),
+      due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+    },
+  },
+  async body => { try { return ok(await api('POST', '/private-tasks', body)) } catch (e) { return fail(e) } }
+)
+
+server.registerTool('criar_subtarefa_privada',
+  {
+    title: 'Criar subtarefa privada',
+    description: 'Cria subtarefa ligada a uma tarefa privada ativa de João.',
+    inputSchema: {
+      tarefa_mae_id: z.string().uuid(),
+      title: z.string().min(1).max(200),
+      context: z.string().max(160).optional(),
+      description: z.string().max(4000).optional(),
+      due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+    },
+  },
+  async ({ tarefa_mae_id, ...body }) => {
+    try { return ok(await api('POST', '/private-tasks', { ...body, parent_task_id: tarefa_mae_id })) } catch (e) { return fail(e) }
+  }
+)
+
+server.registerTool('editar_tarefa_privada',
+  {
+    title: 'Editar tarefa privada',
+    description: 'Edita dados ou status de uma tarefa ou subtarefa privada de João. Para concluir, status=done.',
+    inputSchema: {
+      id: z.string().uuid(),
+      title: z.string().min(1).max(200).optional(),
+      context: z.string().max(160).nullable().optional(),
+      description: z.string().max(4000).nullable().optional(),
+      due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
+      status: z.enum(['todo', 'in_progress', 'done']).optional(),
+    },
+  },
+  async ({ id, ...body }) => {
+    try { return ok(await api('PATCH', `/private-tasks/${encodeURIComponent(id)}`, body)) } catch (e) { return fail(e) }
+  }
+)
+
+server.registerTool('concluir_tarefa_privada',
+  {
+    title: 'Concluir tarefa privada',
+    description: 'Marca tarefa pessoal de João como concluída. A tarefa-mãe exige filhas concluídas.',
+    inputSchema: { id: z.string().uuid() },
+  },
+  async ({ id }) => {
+    try { return ok(await api('PATCH', `/private-tasks/${encodeURIComponent(id)}`, { status: 'done' })) } catch (e) { return fail(e) }
+  }
+)
+
+server.registerTool('excluir_tarefa_privada',
+  {
+    title: 'Excluir tarefa privada',
+    description: 'Exclui de forma reversível tarefa privada de João; se for mãe, suas subtarefas também ficam ocultas.',
+    inputSchema: { id: z.string().uuid() },
+  },
+  async ({ id }) => {
+    try { return ok(await api('DELETE', `/private-tasks/${encodeURIComponent(id)}`)) } catch (e) { return fail(e) }
+  }
+)
+
 server.registerTool('editar_atividade',
   {
     title: 'Editar atividade',
