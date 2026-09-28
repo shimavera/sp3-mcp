@@ -6,7 +6,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -33,6 +33,22 @@ async function api(method, path, body) {
       'Content-Type': 'application/json',
     },
     body: body ? JSON.stringify(body) : undefined,
+  })
+  const text = await res.text()
+  let data
+  try { data = JSON.parse(text) } catch { data = text }
+  if (!res.ok) {
+    const msg = (data && data.error) || `HTTP ${res.status}`
+    throw new Error(msg)
+  }
+  return data
+}
+
+async function apiForm(pathname, form) {
+  const res = await fetch(`${BASE}/api/mcp${pathname}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${TOKEN}` },
+    body: form,
   })
   const text = await res.text()
   let data
@@ -255,6 +271,35 @@ server.registerTool('gerar_contrato',
     },
   },
   async (args) => { try { return ok(await generateContract(args)) } catch (e) { return fail(e) } }
+)
+
+server.registerTool('enviar_contrato_clicksign',
+  {
+    title: 'Enviar contrato para Clicksign',
+    description: 'Envia um PDF local ao Sistema SP3, cria o registro de contrato, dispara o envelope Clicksign para o cliente, SP3 e testemunhas configuradas e retorna os IDs e o status. Exige token de sócio e não abre navegador.',
+    inputSchema: {
+      pdf_path: z.string().min(1).describe('Caminho absoluto do PDF local gerado para o contrato'),
+      client_id: z.string().describe('ID do cliente, obtido em listar_clientes'),
+      title: z.string().min(1).max(180).describe('Título do contrato'),
+      description: z.string().max(500).optional().describe('Descrição opcional'),
+      message: z.string().max(2000).optional().describe('Mensagem opcional enviada aos signatários'),
+    },
+  },
+  async ({ pdf_path, client_id, title, description, message }) => {
+    try {
+      const buffer = await readFile(pdf_path)
+      if (buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
+        throw new Error('O arquivo informado não é um PDF válido')
+      }
+      const form = new FormData()
+      form.append('file', new Blob([buffer], { type: 'application/pdf' }), path.basename(pdf_path))
+      form.append('client_id', client_id)
+      form.append('title', title)
+      if (description) form.append('description', description)
+      if (message) form.append('message', message)
+      return ok(await apiForm('/contracts/upload-and-send', form))
+    } catch (e) { return fail(e) }
+  }
 )
 
 server.registerTool('listar_membros',
