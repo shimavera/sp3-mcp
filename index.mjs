@@ -278,15 +278,23 @@ server.registerTool('enviar_contrato_clicksign',
     title: 'Enviar contrato para Clicksign',
     description: 'Envia um PDF local ao Sistema SP3, cria o registro de contrato, dispara o envelope Clicksign para o cliente, SP3 e testemunhas configuradas e retorna os IDs e o status. Exige token de sócio e não abre navegador.',
     inputSchema: {
-      pdf_path: z.string().min(1).describe('Caminho absoluto do PDF local gerado para o contrato'),
-      client_id: z.string().describe('ID do cliente, obtido em listar_clientes'),
-      title: z.string().min(1).max(180).describe('Título do contrato'),
+      pdf_path: z.string().min(1).optional().describe('Caminho absoluto do PDF local gerado para o contrato'),
+      contract_id: z.string().uuid().optional().describe('ID de um contrato já criado como rascunho no SP3'),
+      client_id: z.string().optional().describe('ID do cliente, obtido em listar_clientes'),
+      title: z.string().min(1).max(180).optional().describe('Título do contrato'),
       description: z.string().max(500).optional().describe('Descrição opcional'),
       message: z.string().max(2000).optional().describe('Mensagem opcional enviada aos signatários'),
     },
   },
-  async ({ pdf_path, client_id, title, description, message }) => {
+  async ({ pdf_path, contract_id, client_id, title, description, message }) => {
     try {
+      if (contract_id) {
+        const form = new FormData()
+        form.append('contract_id', contract_id)
+        if (message) form.append('message', message)
+        return ok(await apiForm('/contracts/upload-and-send', form))
+      }
+      if (!pdf_path || !client_id || !title) throw new Error('Informe pdf_path, client_id e title, ou informe contract_id')
       const buffer = await readFile(pdf_path)
       if (buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
         throw new Error('O arquivo informado não é um PDF válido')
