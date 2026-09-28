@@ -49,14 +49,16 @@ claude mcp add sp3 --env SP3_TOKEN=COLE_SEU_TOKEN_AQUI -- npx -y github:shimaver
 | `atividades_paradas` | Atividades abertas com prazo vencido |
 | `ver_financeiro` | MRR, recebíveis e cobranças do mês (sócio) |
 | `preparar_contrato` | Dados cadastrais e comerciais para contrato (sócio) |
-| `gerar_contrato` | Gera DOCX/PDF no Hermes, sem assinar nem enviar (sócio) |
+| `gerar_contrato` | Gera DOCX/PDF no Hermes (sócio) |
+| `enviar_contrato_clicksign` | Faz upload do PDF no SP3 e envia para Clicksign com retorno dos IDs e status (sócio) |
 
 ## Segurança
 
 O token é pessoal e age **em seu nome** — tudo que você faz fica registrado como seu. Pode revogá-lo a qualquer momento em Configurações. Nunca compartilhe.
 
-Financeiro e dados usados em contrato exigem token de sócio. O MCP não assina,
-envia contratos, cria cobranças ou movimenta valores.
+Financeiro e dados usados em contrato exigem token de sócio. O MCP não assina
+automaticamente em nome de ninguém, mas pode criar e enviar um envelope
+Clicksign para os signatários configurados. Ele não cria cobranças nem movimenta valores.
 
 `criar_cliente_e_projeto` também exige token de sócio. O cliente é criado como
 lead, sem contrato, cobrança ou ciclo financeiro. A mensalidade é opcional e
