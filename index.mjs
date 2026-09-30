@@ -124,7 +124,7 @@ async function generateContract({ clientId, ...input }) {
   }
 }
 
-const server = new McpServer({ name: 'sp3-mcp', version: '1.0.0' })
+const server = new McpServer({ name: 'sp3-mcp', version: '1.2.1' })
 
 server.registerTool('quem_sou_eu',
   { title: 'Quem sou eu', description: 'Mostra o usuário dono do token (nome e papel no sistema SP3).', inputSchema: {} },
@@ -320,10 +320,11 @@ const RECORRENCIA_MAP = { mensal: 'monthly', semanal: 'weekly', quinzenal: 'biwe
 server.registerTool('criar_atividade',
   {
     title: 'Criar atividade',
-    description: 'Cria uma nova atividade num projeto. Use listar_clientes para o project_id. O responsável pode ser passado pelo nome (ex.: "João") — o sistema resolve no time. Para uma atividade RECORRENTE (repete sozinha), passe "recorrencia" (mensal/semanal/quinzenal); em mensal, informe "dia_do_mes" (ex.: 20). O sistema recria a próxima ocorrência automaticamente conforme cada uma é concluída.',
+    description: 'Cria uma nova atividade num projeto, com descrição opcional. Use listar_clientes para o project_id. O responsável pode ser passado pelo nome (ex.: "João") — o sistema resolve no time. Para uma atividade RECORRENTE (repete sozinha), passe "recorrencia" (mensal/semanal/quinzenal); em mensal, informe "dia_do_mes" (ex.: 20). O sistema recria a próxima ocorrência automaticamente conforme cada uma é concluída.',
     inputSchema: {
       project_id: z.string().describe('ID do projeto (de listar_clientes)'),
       title: z.string().describe('Título da atividade'),
+      description: z.string().max(4000).optional().describe('Descrição da atividade. Use para contexto, links, briefing e próximos passos.'),
       responsavel: z.string().optional().describe('Nome do responsável (parcial, ex.: "João"). Resolvido no time. Use listar_membros se houver dúvida.'),
       priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),
       due_date: z.string().optional().describe('Data de vencimento YYYY-MM-DD. Em recorrência, é a 1ª ocorrência (opcional — o sistema calcula se faltar).'),
@@ -344,9 +345,10 @@ server.registerTool('criar_atividade',
 server.registerTool('editar_atividade',
   {
     title: 'Editar atividade',
-    description: 'Edita uma atividade existente: responsável, prazo, prioridade, status e/ou recorrência. Informe ao menos um campo. Use "recorrencia" para ligar (mensal/semanal/quinzenal) ou "nenhuma" para desligar; em mensal, "dia_do_mes".',
+    description: 'Edita uma atividade existente: descrição, responsável, prazo, prioridade, status e/ou recorrência. Informe ao menos um campo. Use "recorrencia" para ligar (mensal/semanal/quinzenal) ou "nenhuma" para desligar; em mensal, "dia_do_mes".',
     inputSchema: {
       id: z.string().describe('ID da atividade'),
+      description: z.string().max(4000).nullable().optional().describe('Nova descrição da atividade. Use null para limpar.'),
       responsavel: z.string().optional().describe('Nome do responsável (parcial). String vazia limpa o responsável.'),
       due_date: z.string().optional().describe('Novo prazo YYYY-MM-DD. String vazia remove o prazo.'),
       priority: z.enum(['low', 'medium', 'high', 'urgent']).optional(),

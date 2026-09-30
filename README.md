@@ -42,7 +42,7 @@ claude mcp add sp3 --env SP3_TOKEN=COLE_SEU_TOKEN_AQUI -- npx -y github:shimaver
 | `atividades` | Atividades de toda a agência |
 | `listar_clientes` | Clientes e projetos |
 | `criar_cliente_e_projeto` | Cria cliente mínimo e projeto inicial (sócio) |
-| `criar_atividade` | Cria atividade num projeto |
+| `criar_atividade` | Cria atividade num projeto, com descrição opcional |
 | `concluir_atividade` | Marca como concluída |
 | `atualizar_status` | Muda o status |
 | `comentar_atividade` | Comenta / anexa evidência |
